@@ -51,7 +51,7 @@ namespace Disruptor.PerfTests.Sequenced
 
         private readonly RingBuffer<ValueEvent> _ringBuffer = RingBuffer<ValueEvent>.CreateMultiProducer(ValueEvent.EventFactory, _bufferSize, new BusySpinWaitStrategy());
         private readonly ValueAdditionEventHandler _handler = new ValueAdditionEventHandler();
-        private readonly BatchEventProcessor<ValueEvent> _batchEventProcessor;
+        private readonly IBatchEventProcessor<ValueEvent> _batchEventProcessor;
         private readonly ValueBatchPublisher[] _valuePublishers = new ValueBatchPublisher[_numPublishers];
 
         public ThreeToOneSequencedBatchThroughputTest()
@@ -62,7 +62,7 @@ namespace Disruptor.PerfTests.Sequenced
                 _valuePublishers[i] = new ValueBatchPublisher(_cyclicBarrier, _ringBuffer, _iterations / _numPublishers, 10);
             }
 
-            _batchEventProcessor = new BatchEventProcessor<ValueEvent>(_ringBuffer, sequenceBarrier, _handler);
+            _batchEventProcessor = _ringBuffer.CreateEventProcessor(sequenceBarrier, _handler);
             _ringBuffer.AddGatingSequences(_batchEventProcessor.Sequence);
         }
 

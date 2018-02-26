@@ -43,14 +43,14 @@ namespace Disruptor.PerfTests.Sequenced
 
         private readonly RingBuffer<long[]> _ringBuffer;
         private readonly LongArrayEventHandler _handler;
-        private readonly BatchEventProcessor<long[]> _batchEventProcessor;
+        private readonly IBatchEventProcessor<long[]> _batchEventProcessor;
 
         public OneToOneSequencedLongArrayThroughputTest()
         {
             _ringBuffer = RingBuffer<long[]>.CreateSingleProducer(() => new long[_arraySize], _bufferSize, new YieldingWaitStrategy());
             var sequenceBarrier = _ringBuffer.NewBarrier();
             _handler = new LongArrayEventHandler();
-            _batchEventProcessor = new BatchEventProcessor<long[]>(_ringBuffer, sequenceBarrier, _handler);
+            _batchEventProcessor = _ringBuffer.CreateEventProcessor(sequenceBarrier, _handler);
             _ringBuffer.AddGatingSequences(_batchEventProcessor.Sequence);
         }
 

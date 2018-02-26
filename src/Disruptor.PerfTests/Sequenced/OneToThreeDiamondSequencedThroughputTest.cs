@@ -53,9 +53,9 @@ namespace Disruptor.PerfTests.Sequenced
         private readonly long _expectedResult;
 
         private readonly RingBuffer<FizzBuzzEvent> _ringBuffer = RingBuffer<FizzBuzzEvent>.CreateSingleProducer(FizzBuzzEvent.EventFactory, _bufferSize, new YieldingWaitStrategy());
-        private readonly BatchEventProcessor<FizzBuzzEvent> _batchProcessorFizz;
-        private readonly BatchEventProcessor<FizzBuzzEvent> _batchProcessorBuzz;
-        private readonly BatchEventProcessor<FizzBuzzEvent> _batchProcessorFizzBuzz;
+        private readonly IBatchEventProcessor<FizzBuzzEvent> _batchProcessorFizz;
+        private readonly IBatchEventProcessor<FizzBuzzEvent> _batchProcessorBuzz;
+        private readonly IBatchEventProcessor<FizzBuzzEvent> _batchProcessorFizzBuzz;
         private readonly FizzBuzzEventHandler _fizzBuzzHandler;
 
         public OneToThreeDiamondSequencedThroughputTest()
@@ -63,15 +63,15 @@ namespace Disruptor.PerfTests.Sequenced
             var sequenceBarrier = _ringBuffer.NewBarrier();
 
             var fizzHandler = new FizzBuzzEventHandler(FizzBuzzStep.Fizz);
-            _batchProcessorFizz = new BatchEventProcessor<FizzBuzzEvent>(_ringBuffer, sequenceBarrier, fizzHandler);
+            _batchProcessorFizz = _ringBuffer.CreateEventProcessor(sequenceBarrier, fizzHandler);
 
             var buzzHandler = new FizzBuzzEventHandler(FizzBuzzStep.Buzz);
-            _batchProcessorBuzz = new BatchEventProcessor<FizzBuzzEvent>(_ringBuffer, sequenceBarrier, buzzHandler);
+            _batchProcessorBuzz = _ringBuffer.CreateEventProcessor(sequenceBarrier, buzzHandler);
 
             var sequenceBarrierFizzBuzz = _ringBuffer.NewBarrier(_batchProcessorFizz.Sequence, _batchProcessorBuzz.Sequence);
 
             _fizzBuzzHandler = new FizzBuzzEventHandler(FizzBuzzStep.FizzBuzz);
-            _batchProcessorFizzBuzz = new BatchEventProcessor<FizzBuzzEvent>(_ringBuffer, sequenceBarrierFizzBuzz, _fizzBuzzHandler);
+            _batchProcessorFizzBuzz = _ringBuffer.CreateEventProcessor(sequenceBarrierFizzBuzz, _fizzBuzzHandler);
 
             var temp = 0L;
             for (long i = 0; i < _iterations; i++)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using Disruptor.Internal;
 
 namespace Disruptor
 {
@@ -11,14 +12,36 @@ namespace Disruptor
     /// is started and just before the thread is shutdown.
     /// </summary>
     /// <typeparam name="T">Event implementation storing the data for sharing during exchange or parallel coordination of an event.</typeparam>
-    public sealed class BatchEventProcessor<T> : IEventProcessor where T : class
+    public sealed class BatchEventProcessor<T> : BatchEventProcessor<T, IDataProvider<T>, ISequenceBarrier, IEventHandler<T>, BatchStartAwareStruct>
+        where T : class
+    {
+        public BatchEventProcessor(IDataProvider<T> dataProvider, ISequenceBarrier sequenceBarrier, IEventHandler<T> eventHandler)
+            : base(dataProvider, sequenceBarrier, eventHandler, new BatchStartAwareStruct(eventHandler))
+        {
+        }
+    }
+
+    /// <summary>
+    /// Convenience class for handling the batching semantics of consuming events from a <see cref="RingBuffer{T}"/>
+    /// and delegating the available events to an <see cref="IEventHandler{T}"/>.
+    /// 
+    /// If the <see cref="BatchEventProcessor{T}"/> also implements <see cref="ILifecycleAware"/> it will be notified just after the thread
+    /// is started and just before the thread is shutdown.
+    /// </summary>
+    /// <typeparam name="T">Event implementation storing the data for sharing during exchange or parallel coordination of an event.</typeparam>
+    public class BatchEventProcessor<T, TDataProvider, TSequenceBarrier, TEventHandler, TBatchStartAware> : IBatchEventProcessor<T>
+        where T : class
+        where TDataProvider : IDataProvider<T>
+        where TSequenceBarrier : ISequenceBarrier
+        where TEventHandler : IEventHandler<T>
+        where TBatchStartAware : IBatchStartAware
     {
         private volatile int _running;
-        private readonly IDataProvider<T> _dataProvider;
-        private readonly ISequenceBarrier _sequenceBarrier;
-        private readonly IEventHandler<T> _eventHandler;
+        private readonly TDataProvider _dataProvider;
+        private readonly TSequenceBarrier _sequenceBarrier;
+        private readonly TEventHandler _eventHandler;
         private readonly Sequence _sequence = new Sequence();
-        private readonly IBatchStartAware _batchStartAware;
+        private readonly TBatchStartAware _batchStartAware;
         private readonly ITimeoutHandler _timeoutHandler;
         private IExceptionHandler<T> _exceptionHandler = new FatalExceptionHandler();
 
@@ -29,7 +52,7 @@ namespace Disruptor
         /// <param name="dataProvider">dataProvider to which events are published</param>
         /// <param name="sequenceBarrier">SequenceBarrier on which it is waiting.</param>
         /// <param name="eventHandler">eventHandler is the delegate to which events are dispatched.</param>
-        public BatchEventProcessor(IDataProvider<T> dataProvider, ISequenceBarrier sequenceBarrier, IEventHandler<T> eventHandler)
+        public BatchEventProcessor(TDataProvider dataProvider, TSequenceBarrier sequenceBarrier, TEventHandler eventHandler, TBatchStartAware batchStartAware)
         {
             _dataProvider = dataProvider;
             _sequenceBarrier = sequenceBarrier;
@@ -38,7 +61,7 @@ namespace Disruptor
             if (eventHandler is ISequenceReportingEventHandler<T> sequenceReportingEventHandler)
                 sequenceReportingEventHandler.SetSequenceCallback(_sequence);
 
-            _batchStartAware = eventHandler as IBatchStartAware;
+            _batchStartAware = batchStartAware;
             _timeoutHandler = eventHandler as ITimeoutHandler;
         }
 
@@ -96,10 +119,7 @@ namespace Disruptor
                     {
                         var availableSequence = _sequenceBarrier.WaitFor(nextSequence);
 
-                        if (_batchStartAware != null)
-                        {
-                            _batchStartAware.OnBatchStart(availableSequence - nextSequence + 1);
-                        }
+                        _batchStartAware.OnBatchStart(availableSequence - nextSequence + 1);
 
                         while (nextSequence <= availableSequence)
                         {

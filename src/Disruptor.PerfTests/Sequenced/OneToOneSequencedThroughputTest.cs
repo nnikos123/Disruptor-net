@@ -42,7 +42,7 @@ namespace Disruptor.PerfTests.Sequenced
         private readonly ValueAdditionEventHandler _eventHandler;
         private readonly ManualResetEvent _latch;
         private readonly long _expectedResult = PerfTestUtil.AccumulatedAddition(_iterations);
-        private readonly BatchEventProcessor<ValueEvent> _batchEventProcessor;
+        private readonly IBatchEventProcessor<ValueEvent> _batchEventProcessor;
         private readonly IExecutor _executor = new BasicExecutor(TaskScheduler.Current);
 
         public OneToOneSequencedThroughputTest()
@@ -51,7 +51,7 @@ namespace Disruptor.PerfTests.Sequenced
             _eventHandler = new ValueAdditionEventHandler();
             _ringBuffer = RingBuffer<ValueEvent>.CreateSingleProducer(ValueEvent.EventFactory, _bufferSize, new YieldingWaitStrategy());
             var sequenceBarrier = _ringBuffer.NewBarrier();
-            _batchEventProcessor = new BatchEventProcessor<ValueEvent>(_ringBuffer, sequenceBarrier, _eventHandler);
+            _batchEventProcessor = _ringBuffer.CreateEventProcessor(sequenceBarrier, _eventHandler);
             _ringBuffer.AddGatingSequences(_batchEventProcessor.Sequence);
         }
 
