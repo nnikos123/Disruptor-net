@@ -45,7 +45,7 @@ namespace Disruptor
         /// <returns></returns>
         public ISequenceBarrier NewBarrier(params ISequence[] sequencesToTrack)
         {
-            return new ProcessingSequenceBarrier(this, _waitStrategy, _cursor, sequencesToTrack);
+            return DisruptorTypeFactory.CreateSequenceBarrier(this, _waitStrategy, _cursor, sequencesToTrack);
         }
         
         /// <summary>

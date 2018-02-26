@@ -4,19 +4,29 @@ namespace Disruptor
     /// <see cref="ISequenceBarrier"/> handed out for gating <see cref="IEventProcessor"/> on a cursor sequence and optional dependent <see cref="IEventProcessor"/>s,
     ///  using the given WaitStrategy.
     /// </summary>
-    internal sealed class ProcessingSequenceBarrier : ISequenceBarrier
+    internal sealed class ProcessingSequenceBarrier : ProcessingSequenceBarrier<ISequencer, IWaitStrategy>
     {
-        private readonly IWaitStrategy _waitStrategy;
-        private readonly ISequence _dependentSequence;
-        private readonly Sequence _cursorSequence;
-        private readonly Sequencer _sequencer;
+        public ProcessingSequenceBarrier(Sequencer sequencer, IWaitStrategy waitStrategy, Sequence cursorSequence, ISequence[] dependentSequences)
+            : base(sequencer, waitStrategy, cursorSequence, dependentSequences)
+        {
+        }
+    }
 
+    /// <summary>
+    /// <see cref="ISequenceBarrier"/> handed out for gating <see cref="IEventProcessor"/> on a cursor sequence and optional dependent <see cref="IEventProcessor"/>s,
+    ///  using the given WaitStrategy.
+    /// </summary>
+    internal class ProcessingSequenceBarrier<TSequencer, TWaitStrategy> : ISequenceBarrier
+        where TWaitStrategy : IWaitStrategy
+        where TSequencer : ISequencer
+    {
+        private readonly TSequencer _sequencer;
+        private readonly TWaitStrategy _waitStrategy;
+        private readonly Sequence _cursorSequence;
+        private readonly ISequence _dependentSequence;
         private volatile bool _alerted;
 
-        public ProcessingSequenceBarrier(Sequencer sequencer, 
-                                         IWaitStrategy waitStrategy, 
-                                         Sequence cursorSequence, 
-                                         ISequence[] dependentSequences)
+        public ProcessingSequenceBarrier(TSequencer sequencer, TWaitStrategy waitStrategy, Sequence cursorSequence, ISequence[] dependentSequences)
         {
             _waitStrategy = waitStrategy;
             _cursorSequence = cursorSequence;
