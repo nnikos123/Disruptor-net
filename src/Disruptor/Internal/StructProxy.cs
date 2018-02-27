@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -10,127 +11,12 @@ namespace Disruptor.Internal
         private static readonly ModuleBuilder _moduleBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(nameof(StructProxy) + ".DynamicAssembly"), AssemblyBuilderAccess.Run)
                                                                               .DefineDynamicModule(nameof(StructProxy));
 
-        private static readonly Dictionary<Type, Type> _eventHandlerProxyTypes = new Dictionary<Type, Type>();
-        private static readonly Dictionary<Type, Type> _waitStrategyProxyTypes = new Dictionary<Type, Type>();
+        private static readonly Dictionary<ProxyKey, Type> _proxyTypes = new Dictionary<ProxyKey, Type>();
 
         public static IBatchStartAware CreateBatchStartAware<T>(IEventHandler<T> eventHandler)
             => eventHandler is IBatchStartAware batchStartAware ? batchStartAware : new NoopBatchStartAwareStruct();
 
-        public static ISequenceBarrier CreateSequenceBarrier(ISequenceBarrier sequenceBarrier)
-        {
-            var sequenceBarrierType = sequenceBarrier.GetType();
-            if (sequenceBarrierType.IsGenericType && sequenceBarrierType.GetGenericTypeDefinition() == typeof(ProcessingSequenceBarrier<,>))
-            {
-                var proxyType = typeof(ProcessingSequenceBarrierStruct<,>).MakeGenericType(sequenceBarrierType.GetGenericArguments());
-                return (ISequenceBarrier)Activator.CreateInstance(proxyType, sequenceBarrier);
-            }
-
-            return sequenceBarrier;
-        }
-
-        public static IDataProvider<T> CreateDataProvider<T>(IDataProvider<T> dataProvider)
-            where T : class
-            => dataProvider is RingBuffer<T> ringBuffer ? new RingBufferDataProviderStruct<T>(ringBuffer) : dataProvider;
-
-        public static IEventHandler<T> CreateEventHandler<T>(IEventHandler<T> eventHandler)
-        {
-            return CreateProxyInstance(eventHandler, _eventHandlerProxyTypes, GenerateEventHandlerProxyType<T>);
-        }
-
-        private static Type GenerateEventHandlerProxyType<T>(Type eventHandlerType)
-        {
-            if (!eventHandlerType.IsPublic)
-                return null;
-
-            var onEventMethodInfo = eventHandlerType.GetMethod(nameof(IEventHandler<T>.OnEvent));
-            if (onEventMethodInfo == null)
-                return null;
-
-            var typeBuilder = _moduleBuilder.DefineType($"StructProxy_{eventHandlerType.Name}_{Guid.NewGuid():N}", TypeAttributes.Public, typeof(ValueType));
-            typeBuilder.AddInterfaceImplementation(typeof(IEventHandler<T>));
-
-            var field = typeBuilder.DefineField("_eventHandler", eventHandlerType, FieldAttributes.Private);
-
-            var constructor = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new[] { eventHandlerType });
-
-            var constructorGenerator = constructor.GetILGenerator();
-            constructorGenerator.Emit(OpCodes.Ldarg_0);
-            constructorGenerator.Emit(OpCodes.Ldarg_1);
-            constructorGenerator.Emit(OpCodes.Stfld, field);
-            constructorGenerator.Emit(OpCodes.Ret);
-
-            var onEventMethod = typeBuilder.DefineMethod(nameof(IEventHandler<T>.OnEvent), MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final, typeof(void), new[] { typeof(T), typeof(long), typeof(bool) });
-            onEventMethod.SetImplementationFlags(onEventMethod.GetMethodImplementationFlags() | MethodImplAttributes.AggressiveInlining);
-
-            var onEventGenerator = onEventMethod.GetILGenerator();
-            onEventGenerator.Emit(OpCodes.Ldarg_0);
-            onEventGenerator.Emit(OpCodes.Ldfld, field);
-            onEventGenerator.Emit(OpCodes.Ldarg_1);
-            onEventGenerator.Emit(OpCodes.Ldarg_2);
-            onEventGenerator.Emit(OpCodes.Ldarg_3);
-            onEventGenerator.Emit(OpCodes.Call, onEventMethodInfo);
-            onEventGenerator.Emit(OpCodes.Ret);
-
-            return typeBuilder.CreateTypeInfo();
-        }
-
-        public static IWaitStrategy CreateWaitStrategy(IWaitStrategy waitStrategy)
-        {
-            return CreateProxyInstance(waitStrategy, _waitStrategyProxyTypes, GenerateWaitStrategyProxyType);
-        }
-
-        private static Type GenerateWaitStrategyProxyType(Type waitStrategyType)
-        {
-            if (!waitStrategyType.IsPublic)
-                return null;
-
-            var waitForMethodInfo = waitStrategyType.GetMethod(nameof(IWaitStrategy.WaitFor));
-            if (waitForMethodInfo == null)
-                return null;
-
-            var signalAllWhenBlockingMethodInfo = waitStrategyType.GetMethod(nameof(IWaitStrategy.SignalAllWhenBlocking));
-            if (signalAllWhenBlockingMethodInfo == null)
-                return null;
-
-            var typeBuilder = _moduleBuilder.DefineType($"StructProxy_{waitStrategyType.Name}_{Guid.NewGuid():N}", TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit, typeof(ValueType));
-            typeBuilder.AddInterfaceImplementation(typeof(IWaitStrategy));
-
-            var field = typeBuilder.DefineField("_waitStrategy", waitStrategyType, FieldAttributes.Private);
-
-            var constructor = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new[] { waitStrategyType });
-
-            var constructorGenerator = constructor.GetILGenerator();
-            constructorGenerator.Emit(OpCodes.Ldarg_0);
-            constructorGenerator.Emit(OpCodes.Ldarg_1);
-            constructorGenerator.Emit(OpCodes.Stfld, field);
-            constructorGenerator.Emit(OpCodes.Ret);
-
-            var waitForMethod = typeBuilder.DefineMethod(nameof(IWaitStrategy.WaitFor), MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.HideBySig | MethodAttributes.NewSlot, typeof(long), new[] { typeof(long), typeof(Sequence), typeof(ISequence), typeof(ISequenceBarrier) });
-            //waitForMethod.SetImplementationFlags(waitForMethod.GetMethodImplementationFlags() | MethodImplAttributes.AggressiveInlining);
-
-            var waitForGenerator = waitForMethod.GetILGenerator();
-            waitForGenerator.Emit(OpCodes.Ldarg_0);
-            waitForGenerator.Emit(OpCodes.Ldfld, field);
-            waitForGenerator.Emit(OpCodes.Ldarg_1);
-            waitForGenerator.Emit(OpCodes.Ldarg_2);
-            waitForGenerator.Emit(OpCodes.Ldarg_3);
-            waitForGenerator.Emit(OpCodes.Ldarg_S, (byte)4);
-            waitForGenerator.Emit(OpCodes.Callvirt, waitForMethodInfo);
-            waitForGenerator.Emit(OpCodes.Ret);
-
-            var signalAllWhenBlockingMethod = typeBuilder.DefineMethod(nameof(IWaitStrategy.SignalAllWhenBlocking), MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.HideBySig | MethodAttributes.NewSlot, typeof(void), Type.EmptyTypes);
-            signalAllWhenBlockingMethod.SetImplementationFlags(signalAllWhenBlockingMethod.GetMethodImplementationFlags() | MethodImplAttributes.AggressiveInlining);
-
-            var signalAllWhenBlockingGenerator = signalAllWhenBlockingMethod.GetILGenerator();
-            signalAllWhenBlockingGenerator.Emit(OpCodes.Ldarg_0);
-            signalAllWhenBlockingGenerator.Emit(OpCodes.Ldfld, field);
-            signalAllWhenBlockingGenerator.Emit(OpCodes.Call, signalAllWhenBlockingMethodInfo);
-            signalAllWhenBlockingGenerator.Emit(OpCodes.Ret);
-
-            return typeBuilder.CreateTypeInfo();
-        }
-
-        private static T CreateProxyInstance<T>(T target, Dictionary<Type, Type> proxyTypes, Func<Type, Type> proxyFactory)
+        public static TInterface CreateProxyInstance<TInterface>(TInterface target)
         {
             var targetType = target.GetType();
 
@@ -138,19 +24,89 @@ namespace Disruptor.Internal
                 return target;
 
             Type proxyType;
-            lock (proxyTypes)
+            lock (_proxyTypes)
             {
-                if (!proxyTypes.TryGetValue(targetType, out proxyType))
+                var proxyKey = new ProxyKey(typeof(TInterface), targetType);
+                if (!_proxyTypes.TryGetValue(proxyKey, out proxyType))
                 {
-                    proxyType = proxyFactory.Invoke(targetType);
-                    proxyTypes.Add(targetType, proxyType);
+                    proxyType = GenerateStructProxyType(typeof(TInterface), targetType);
+                    _proxyTypes.Add(proxyKey, proxyType);
                 }
             }
 
             if (proxyType == null)
                 return target;
 
-            return (T)Activator.CreateInstance(proxyType, target);
+            return (TInterface)Activator.CreateInstance(proxyType, target);
+        }
+
+        private static Type GenerateStructProxyType(Type interfaceType, Type targetType)
+        {
+            if (!targetType.IsPublic)
+                return null;
+
+            var typeBuilder = _moduleBuilder.DefineType($"StructProxy_{targetType.Name}_{Guid.NewGuid():N}", TypeAttributes.Public, typeof(ValueType));
+            typeBuilder.AddInterfaceImplementation(interfaceType);
+
+            var field = typeBuilder.DefineField("_target", targetType, FieldAttributes.Private);
+
+            var constructor = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new[] { targetType });
+
+            var constructorGenerator = constructor.GetILGenerator();
+            constructorGenerator.Emit(OpCodes.Ldarg_0);
+            constructorGenerator.Emit(OpCodes.Ldarg_1);
+            constructorGenerator.Emit(OpCodes.Stfld, field);
+            constructorGenerator.Emit(OpCodes.Ret);
+
+            var interfaceMap = targetType.GetInterfaceMap(interfaceType);
+
+            for (var index = 0; index < interfaceMap.InterfaceMethods.Length; index++)
+            {
+                var interfaceMethodInfo = interfaceMap.InterfaceMethods[index];
+                var targetMethodInfo = interfaceMap.TargetMethods[index];
+                var parameters = interfaceMethodInfo.GetParameters();
+
+                var method = typeBuilder.DefineMethod(interfaceMethodInfo.Name, MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final, interfaceMethodInfo.ReturnType, parameters.Select(x => x.ParameterType).ToArray());
+                method.SetImplementationFlags(method.GetMethodImplementationFlags() | MethodImplAttributes.AggressiveInlining);
+
+                var methodGenerator = method.GetILGenerator();
+                methodGenerator.Emit(OpCodes.Ldarg_0);
+                methodGenerator.Emit(OpCodes.Ldfld, field);
+
+                for (var parameterIndex = 0; parameterIndex < parameters.Length; parameterIndex++)
+                {
+                    methodGenerator.Emit(OpCodes.Ldarg_S, (byte)parameterIndex + 1);
+                }
+                methodGenerator.Emit(OpCodes.Call, targetMethodInfo);
+                methodGenerator.Emit(OpCodes.Ret);
+            }
+
+            return typeBuilder.CreateTypeInfo();
+        }
+
+        private struct ProxyKey : IEquatable<ProxyKey>
+        {
+            private readonly Type _interfaceType;
+            private readonly Type _targetType;
+
+            public ProxyKey(Type interfaceType, Type targetType)
+            {
+                _interfaceType = interfaceType;
+                _targetType = targetType;
+            }
+
+            public bool Equals(ProxyKey other)
+            {
+                return _interfaceType == other._interfaceType && _targetType == other._targetType;
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return ((_interfaceType != null ? _interfaceType.GetHashCode() : 0) * 397) ^ (_targetType != null ? _targetType.GetHashCode() : 0);
+                }
+            }
         }
     }
 }

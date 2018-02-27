@@ -6,7 +6,7 @@ namespace Disruptor
 {
     public static class BatchEventProcessor
     {
-        public static IBatchEventProcessor<T> Create<T>(this IDataProvider<T> dataProvider, ISequenceBarrier sequenceBarrier, IEventHandler<T> eventHandler)
+        public static IBatchEventProcessor<T> Create<T>(IDataProvider<T> dataProvider, ISequenceBarrier sequenceBarrier, IEventHandler<T> eventHandler)
             where T : class
         {
             return DisruptorTypeFactory.CreateEventProcessor(dataProvider, sequenceBarrier, eventHandler);

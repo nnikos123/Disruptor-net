@@ -7,9 +7,9 @@ namespace Disruptor.Internal
         public static IBatchEventProcessor<T> CreateEventProcessor<T>(IDataProvider<T> dataProvider, ISequenceBarrier sequenceBarrier, IEventHandler<T> eventHandler)
             where T : class
         {
-            var dataProviderProxy = StructProxy.CreateDataProvider(dataProvider);
-            var sequenceBarrierProxy = StructProxy.CreateSequenceBarrier(sequenceBarrier);
-            var eventHandlerProxy = StructProxy.CreateEventHandler(eventHandler);
+            var dataProviderProxy = StructProxy.CreateProxyInstance(dataProvider);
+            var sequenceBarrierProxy = StructProxy.CreateProxyInstance(sequenceBarrier);
+            var eventHandlerProxy = StructProxy.CreateProxyInstance(eventHandler);
             var batchStartAwareProxy = StructProxy.CreateBatchStartAware(eventHandler);
 
             var batchEventProcessorType = typeof(BatchEventProcessor<,,,,>).MakeGenericType(typeof(T), dataProviderProxy.GetType(), sequenceBarrierProxy.GetType(), eventHandlerProxy.GetType(), batchStartAwareProxy.GetType());
@@ -19,7 +19,7 @@ namespace Disruptor.Internal
         public static ISequenceBarrier CreateSequenceBarrier(ISequencer sequencer, IWaitStrategy waitStrategy, Sequence cursorSequence, ISequence[] dependentSequences)
         {
             // TODO: generate proxy for sequencer
-            var waitStrategyProxy = StructProxy.CreateWaitStrategy(waitStrategy);
+            var waitStrategyProxy = StructProxy.CreateProxyInstance(waitStrategy);
 
             var sequencerBarrierType = typeof(ProcessingSequenceBarrier<,>).MakeGenericType(sequencer.GetType(), waitStrategyProxy.GetType());
             return (ISequenceBarrier)Activator.CreateInstance(sequencerBarrierType, sequencer, waitStrategyProxy, cursorSequence, dependentSequences);
@@ -27,7 +27,7 @@ namespace Disruptor.Internal
 
         public static ISequencer CreateSingleProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
         {
-            var waitStrategyProxy = StructProxy.CreateWaitStrategy(waitStrategy);
+            var waitStrategyProxy = StructProxy.CreateProxyInstance(waitStrategy);
 
             var sequencerType = typeof(SingleProducerSequencer<>).MakeGenericType(waitStrategyProxy.GetType());
             return (ISequencer)Activator.CreateInstance(sequencerType, bufferSize, waitStrategyProxy);
@@ -35,7 +35,7 @@ namespace Disruptor.Internal
 
         public static ISequencer CreateMultiProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
         {
-            var waitStrategyProxy = StructProxy.CreateWaitStrategy(waitStrategy);
+            var waitStrategyProxy = StructProxy.CreateProxyInstance(waitStrategy);
 
             var sequencerType = typeof(MultiProducerSequencer).MakeGenericType(waitStrategyProxy.GetType());
             return (ISequencer)Activator.CreateInstance(sequencerType, bufferSize, waitStrategyProxy);
