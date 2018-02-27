@@ -13,7 +13,7 @@ namespace Disruptor.Tests
     {
         private const int _bufferSize = 16;
         private readonly ProducerType _producerType;
-        private Sequencer _sequencer;
+        private ISequencer _sequencer;
         private Sequence _gatingSequence;
 
         public SequencerTests(ProducerType producerType)
@@ -21,14 +21,14 @@ namespace Disruptor.Tests
             _producerType = producerType;
         }
 
-        private Sequencer NewProducer(ProducerType producerType, int bufferSize, IWaitStrategy waitStrategy)
+        private ISequencer NewProducer(ProducerType producerType, int bufferSize, IWaitStrategy waitStrategy)
         {
             switch (producerType)
             {
                 case ProducerType.Single:
-                    return new SingleProducerSequencer(bufferSize, waitStrategy);
+                    return SingleProducerSequencer.Create(bufferSize, waitStrategy);
                 case ProducerType.Multi:
-                    return new MultiProducerSequencer(bufferSize, waitStrategy);
+                    return MultiProducerSequencer.Create(bufferSize, waitStrategy);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(producerType), producerType, null);
             }

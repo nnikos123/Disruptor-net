@@ -53,7 +53,7 @@ namespace Disruptor.PerfTests.Sequenced
             _ringBuffer = RingBuffer<ValueEvent>.CreateSingleProducer(ValueEvent.EventFactory, _bufferSize, new YieldingWaitStrategy());
             var sequenceBarrier = _ringBuffer.NewBarrier();
             _handler = new ValueAdditionEventHandler();
-            _batchEventProcessor = _ringBuffer.CreateEventProcessor(sequenceBarrier, _handler);
+            _batchEventProcessor = BatchEventProcessor.Create(_ringBuffer, sequenceBarrier, _handler);
             _ringBuffer.AddGatingSequences(_batchEventProcessor.Sequence);
         }
 

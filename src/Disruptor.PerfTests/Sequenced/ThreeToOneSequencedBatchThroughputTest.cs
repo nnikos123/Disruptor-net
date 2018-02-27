@@ -62,7 +62,7 @@ namespace Disruptor.PerfTests.Sequenced
                 _valuePublishers[i] = new ValueBatchPublisher(_cyclicBarrier, _ringBuffer, _iterations / _numPublishers, 10);
             }
 
-            _batchEventProcessor = _ringBuffer.CreateEventProcessor(sequenceBarrier, _handler);
+            _batchEventProcessor = BatchEventProcessor.Create(_ringBuffer, sequenceBarrier, _handler);
             _ringBuffer.AddGatingSequences(_batchEventProcessor.Sequence);
         }
 

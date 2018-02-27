@@ -400,7 +400,7 @@ namespace Disruptor.Dsl
             {
                 var eventHandler = eventHandlers[i];
 
-                var batchEventProcessor = DisruptorTypeFactory.CreateEventProcessor(_ringBuffer, barrier, eventHandler);
+                var batchEventProcessor = BatchEventProcessor.Create(_ringBuffer, barrier, eventHandler);
 
                 if (_exceptionHandler != null)
                     batchEventProcessor.SetExceptionHandler(_exceptionHandler);

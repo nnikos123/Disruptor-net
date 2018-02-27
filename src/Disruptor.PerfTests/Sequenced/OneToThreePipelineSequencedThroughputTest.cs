@@ -58,13 +58,13 @@ namespace Disruptor.PerfTests.Sequenced
             _stepThreeFunctionHandler = new FunctionEventHandler(FunctionStep.Three);
 
             var stepOneSequenceBarrier = _ringBuffer.NewBarrier();
-            _stepOneBatchProcessor = _ringBuffer.CreateEventProcessor(stepOneSequenceBarrier, stepOneFunctionHandler);
+            _stepOneBatchProcessor = BatchEventProcessor.Create(_ringBuffer, stepOneSequenceBarrier, stepOneFunctionHandler);
 
             var stepTwoSequenceBarrier = _ringBuffer.NewBarrier(_stepOneBatchProcessor.Sequence);
-            _stepTwoBatchProcessor = _ringBuffer.CreateEventProcessor(stepTwoSequenceBarrier, stepTwoFunctionHandler);
+            _stepTwoBatchProcessor = BatchEventProcessor.Create(_ringBuffer, stepTwoSequenceBarrier, stepTwoFunctionHandler);
 
             var stepThreeSequenceBarrier = _ringBuffer.NewBarrier(_stepTwoBatchProcessor.Sequence);
-            _stepThreeBatchProcessor = _ringBuffer.CreateEventProcessor(stepThreeSequenceBarrier, _stepThreeFunctionHandler);
+            _stepThreeBatchProcessor = BatchEventProcessor.Create(_ringBuffer, stepThreeSequenceBarrier, _stepThreeFunctionHandler);
 
             var temp = 0L;
             var operandTwo = _operandTwoInitialValue;

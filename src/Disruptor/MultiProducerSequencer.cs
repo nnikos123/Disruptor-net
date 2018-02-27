@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using Disruptor.Internal;
 
 namespace Disruptor
 {
@@ -11,7 +12,30 @@ namespace Disruptor
     /// to <see cref="Sequencer.Next()"/>, to determine the highest available sequence that can be read, then
     /// <see cref="GetHighestPublishedSequence"/> should be used. 
     /// </summary>
-    public class MultiProducerSequencer : Sequencer
+    public class MultiProducerSequencer : MultiProducerSequencer<IWaitStrategy>
+    {
+        public MultiProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
+            : base(bufferSize, waitStrategy)
+        {
+        }
+
+        public static ISequencer Create(int bufferSize, IWaitStrategy waitStrategy)
+        {
+            return DisruptorTypeFactory.CreateMultiProducerSequencer(bufferSize, waitStrategy);
+            //return new MultiProducerSequencer(bufferSize, waitStrategy);
+        }
+    }
+
+    /// <summary>
+    /// <para>Coordinator for claiming sequences for access to a data structure while tracking dependent <see cref="Sequence"/>s.
+    /// Suitable for use for sequencing across multiple publisher threads.</para>
+    /// <para/>
+    /// <para/>Note on <see cref="Sequencer.Cursor"/>:  With this sequencer the cursor value is updated after the call
+    /// to <see cref="Sequencer.Next()"/>, to determine the highest available sequence that can be read, then
+    /// <see cref="GetHighestPublishedSequence"/> should be used. 
+    /// </summary>
+    public class MultiProducerSequencer<TWaitStrategy> : Sequencer<TWaitStrategy>
+        where TWaitStrategy : IWaitStrategy
     {
         private readonly Sequence _gatingSequenceCache = new Sequence();
 
@@ -21,7 +45,7 @@ namespace Disruptor
         private readonly int _indexMask;
         private readonly int _indexShift;
 
-        public MultiProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
+        public MultiProducerSequencer(int bufferSize, TWaitStrategy waitStrategy)
             : base(bufferSize, waitStrategy)
         {
             _availableBuffer = new int[bufferSize];

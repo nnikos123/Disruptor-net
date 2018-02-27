@@ -63,15 +63,15 @@ namespace Disruptor.PerfTests.Sequenced
             var sequenceBarrier = _ringBuffer.NewBarrier();
 
             var fizzHandler = new FizzBuzzEventHandler(FizzBuzzStep.Fizz);
-            _batchProcessorFizz = _ringBuffer.CreateEventProcessor(sequenceBarrier, fizzHandler);
+            _batchProcessorFizz = BatchEventProcessor.Create(_ringBuffer, sequenceBarrier, fizzHandler);
 
             var buzzHandler = new FizzBuzzEventHandler(FizzBuzzStep.Buzz);
-            _batchProcessorBuzz = _ringBuffer.CreateEventProcessor(sequenceBarrier, buzzHandler);
+            _batchProcessorBuzz = BatchEventProcessor.Create(_ringBuffer, sequenceBarrier, buzzHandler);
 
             var sequenceBarrierFizzBuzz = _ringBuffer.NewBarrier(_batchProcessorFizz.Sequence, _batchProcessorBuzz.Sequence);
 
             _fizzBuzzHandler = new FizzBuzzEventHandler(FizzBuzzStep.FizzBuzz);
-            _batchProcessorFizzBuzz = _ringBuffer.CreateEventProcessor(sequenceBarrierFizzBuzz, _fizzBuzzHandler);
+            _batchProcessorFizzBuzz = BatchEventProcessor.Create(_ringBuffer, sequenceBarrierFizzBuzz, _fizzBuzzHandler);
 
             var temp = 0L;
             for (long i = 0; i < _iterations; i++)

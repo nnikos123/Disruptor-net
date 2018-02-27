@@ -2,11 +2,13 @@
 
 namespace Disruptor.Internal
 {
-    internal struct ProcessingSequenceBarrierStruct : ISequenceBarrier
+    internal struct ProcessingSequenceBarrierStruct<TSequencer, TWaitStrategy> : ISequenceBarrier
+        where TSequencer : ISequencer
+        where TWaitStrategy : IWaitStrategy
     {
-        private readonly ProcessingSequenceBarrier _sequenceBarrier;
+        private readonly ProcessingSequenceBarrier<TSequencer, TWaitStrategy> _sequenceBarrier;
 
-        public ProcessingSequenceBarrierStruct(ProcessingSequenceBarrier sequenceBarrier)
+        public ProcessingSequenceBarrierStruct(ProcessingSequenceBarrier<TSequencer, TWaitStrategy> sequenceBarrier)
         {
             _sequenceBarrier = sequenceBarrier;
         }

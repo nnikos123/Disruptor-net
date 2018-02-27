@@ -4,6 +4,30 @@ using Disruptor.Internal;
 
 namespace Disruptor
 {
+    public static class BatchEventProcessor
+    {
+        public static IBatchEventProcessor<T> Create<T>(this IDataProvider<T> dataProvider, ISequenceBarrier sequenceBarrier, IEventHandler<T> eventHandler)
+            where T : class
+        {
+            return DisruptorTypeFactory.CreateEventProcessor(dataProvider, sequenceBarrier, eventHandler);
+        }
+
+        public struct BatchStartAware : IBatchStartAware
+        {
+            private readonly IBatchStartAware _eventHandler;
+
+            public BatchStartAware(object eventHandler)
+            {
+                _eventHandler = eventHandler as IBatchStartAware;
+            }
+
+            public void OnBatchStart(long batchSize)
+            {
+                _eventHandler?.OnBatchStart(batchSize);
+            }
+        }
+    }
+
     /// <summary>
     /// Convenience class for handling the batching semantics of consuming events from a <see cref="RingBuffer{T}"/>
     /// and delegating the available events to an <see cref="IEventHandler{T}"/>.
@@ -12,11 +36,11 @@ namespace Disruptor
     /// is started and just before the thread is shutdown.
     /// </summary>
     /// <typeparam name="T">Event implementation storing the data for sharing during exchange or parallel coordination of an event.</typeparam>
-    public sealed class BatchEventProcessor<T> : BatchEventProcessor<T, IDataProvider<T>, ISequenceBarrier, IEventHandler<T>, BatchStartAwareStruct>
+    public sealed class BatchEventProcessor<T> : BatchEventProcessor<T, IDataProvider<T>, ISequenceBarrier, IEventHandler<T>, BatchEventProcessor.BatchStartAware>
         where T : class
     {
         public BatchEventProcessor(IDataProvider<T> dataProvider, ISequenceBarrier sequenceBarrier, IEventHandler<T> eventHandler)
-            : base(dataProvider, sequenceBarrier, eventHandler, new BatchStartAwareStruct(eventHandler))
+            : base(dataProvider, sequenceBarrier, eventHandler, new BatchEventProcessor.BatchStartAware(eventHandler))
         {
         }
     }
@@ -37,11 +61,15 @@ namespace Disruptor
         where TBatchStartAware : IBatchStartAware
     {
         private volatile int _running;
-        private readonly TDataProvider _dataProvider;
-        private readonly TSequenceBarrier _sequenceBarrier;
-        private readonly TEventHandler _eventHandler;
+        // ReSharper disable once FieldCanBeMadeReadOnly.Local (performance: the runtime type will be a struct)
+        private TDataProvider _dataProvider;
+        // ReSharper disable once FieldCanBeMadeReadOnly.Local (performance: the runtime type will be a struct)
+        private TSequenceBarrier _sequenceBarrier;
+        // ReSharper disable once FieldCanBeMadeReadOnly.Local (performance: the runtime type will be a struct)
+        private TEventHandler _eventHandler;
         private readonly Sequence _sequence = new Sequence();
-        private readonly TBatchStartAware _batchStartAware;
+        // ReSharper disable once FieldCanBeMadeReadOnly.Local (performance: the runtime type will be a struct)
+        private TBatchStartAware _batchStartAware;
         private readonly ITimeoutHandler _timeoutHandler;
         private IExceptionHandler<T> _exceptionHandler = new FatalExceptionHandler();
 

@@ -1,3 +1,5 @@
+using Disruptor.Internal;
+
 namespace Disruptor
 {
     /// <summary>
@@ -6,9 +8,14 @@ namespace Disruptor
     /// </summary>
     internal sealed class ProcessingSequenceBarrier : ProcessingSequenceBarrier<ISequencer, IWaitStrategy>
     {
-        public ProcessingSequenceBarrier(Sequencer sequencer, IWaitStrategy waitStrategy, Sequence cursorSequence, ISequence[] dependentSequences)
+        public ProcessingSequenceBarrier(ISequencer sequencer, IWaitStrategy waitStrategy, Sequence cursorSequence, ISequence[] dependentSequences)
             : base(sequencer, waitStrategy, cursorSequence, dependentSequences)
         {
+        }
+
+        public static ISequenceBarrier Create(ISequencer sequencer, IWaitStrategy waitStrategy, Sequence cursorSequence, ISequence[] dependentSequences)
+        {
+            return DisruptorTypeFactory.CreateSequenceBarrier(sequencer, waitStrategy, cursorSequence, dependentSequences);
         }
     }
 
@@ -20,8 +27,10 @@ namespace Disruptor
         where TWaitStrategy : IWaitStrategy
         where TSequencer : ISequencer
     {
-        private readonly TSequencer _sequencer;
-        private readonly TWaitStrategy _waitStrategy;
+        // ReSharper disable once FieldCanBeMadeReadOnly.Local (performance: the runtime type will be a struct)
+        private TSequencer _sequencer;
+        // ReSharper disable once FieldCanBeMadeReadOnly.Local (performance: the runtime type will be a struct)
+        private TWaitStrategy _waitStrategy;
         private readonly Sequence _cursorSequence;
         private readonly ISequence _dependentSequence;
         private volatile bool _alerted;
@@ -37,7 +46,10 @@ namespace Disruptor
 
         public long WaitFor(long sequence)
         {
-            CheckAlert();
+            if (_alerted)
+            {
+                throw AlertException.Instance;
+            }
 
             var availableSequence = _waitStrategy.WaitFor(sequence, _cursorSequence, _dependentSequence, this);
 

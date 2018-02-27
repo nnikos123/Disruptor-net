@@ -38,8 +38,8 @@ namespace Disruptor.PerfTests.Sequenced
             _pinger = new Pinger(_pingBuffer, _iterations, _pauseDurationInNanos);
             _ponger = new Ponger(_pongBuffer);
 
-            _pingProcessor = _pongBuffer.CreateEventProcessor(_pongBarrier, _pinger);
-            _pongProcessor = _pingBuffer.CreateEventProcessor(_pingBarrier, _ponger);
+            _pingProcessor = BatchEventProcessor.Create(_pongBuffer, _pongBarrier, _pinger);
+            _pongProcessor = BatchEventProcessor.Create(_pingBuffer, _pingBarrier, _ponger);
 
             _pingBuffer.AddGatingSequences(_pongProcessor.Sequence);
             _pongBuffer.AddGatingSequences(_pingProcessor.Sequence);

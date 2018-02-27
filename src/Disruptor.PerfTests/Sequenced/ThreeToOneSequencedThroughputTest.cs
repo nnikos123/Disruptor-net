@@ -61,7 +61,7 @@ namespace Disruptor.PerfTests.Sequenced
         public ThreeToOneSequencedThroughputTest()
         {
             _sequenceBarrier = _ringBuffer.NewBarrier();
-            _batchEventProcessor = _ringBuffer.CreateEventProcessor(_sequenceBarrier, _handler);
+            _batchEventProcessor = BatchEventProcessor.Create(_ringBuffer, _sequenceBarrier, _handler);
             for (var i = 0; i < _numPublishers; i++)
             {
                 _valuePublishers[i] = ValuePublisher;

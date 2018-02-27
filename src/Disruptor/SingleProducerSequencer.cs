@@ -1,14 +1,29 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using System.Threading;
+using Disruptor.Internal;
 
 namespace Disruptor
 {
-    public class SingleProducerSequencer : Sequencer
+    public class SingleProducerSequencer : SingleProducerSequencer<IWaitStrategy>
     {
-        private Fields _fields = new Fields(Sequence.InitialCursorValue, Sequence.InitialCursorValue);
-
         public SingleProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
+            : base(bufferSize, waitStrategy)
+        {
+        }
+
+        public static ISequencer Create(int bufferSize, IWaitStrategy waitStrategy)
+        {
+            return DisruptorTypeFactory.CreateSingleProducerSequencer(bufferSize, waitStrategy);
+            //return new SingleProducerSequencer(bufferSize, waitStrategy);
+        }
+    }
+
+    public class SingleProducerSequencer<TWaitStrategy> : Sequencer<TWaitStrategy>
+        where TWaitStrategy : IWaitStrategy
+    {
+        private SingleProducerSequencerFields _fields = new SingleProducerSequencerFields(Sequence.InitialCursorValue, Sequence.InitialCursorValue);
+
+        public SingleProducerSequencer(int bufferSize, TWaitStrategy waitStrategy)
             : base(bufferSize, waitStrategy)
         {
         }
@@ -255,21 +270,6 @@ namespace Disruptor
         public override long GetHighestPublishedSequence(long nextSequence, long availableSequence)
         {
             return availableSequence;
-        }
-
-        [StructLayout(LayoutKind.Explicit, Size = 128)]
-        private struct Fields
-        {
-            [FieldOffset(56)]
-            public long NextValue;
-            [FieldOffset(64)]
-            public long CachedValue;
-
-            public Fields(long nextValue, long cachedValue)
-            {
-                NextValue = nextValue;
-                CachedValue = cachedValue;
-            }
         }
     }
 }

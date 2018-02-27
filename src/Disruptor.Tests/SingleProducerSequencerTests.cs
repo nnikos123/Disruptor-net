@@ -8,7 +8,7 @@ namespace Disruptor.Tests
         [Test]
         public void ShouldNotUpdateCursorDuringHasAvailableCapacity()
         {
-            var sequencer = new SingleProducerSequencer(16, new BusySpinWaitStrategy());
+            var sequencer = SingleProducerSequencer.Create(16, new BusySpinWaitStrategy());
 
             for (int i = 0; i < 32; i++)
             {

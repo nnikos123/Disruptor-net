@@ -72,7 +72,7 @@ namespace Disruptor.PerfTests.Sequenced
 
             for (var i = 0; i < _numEventProcessors; i++)
             {
-                _batchEventProcessors[i] = _ringBuffer.CreateEventProcessor(sequenceBarrier, _handlers[i]);
+                _batchEventProcessors[i] = BatchEventProcessor.Create(_ringBuffer, sequenceBarrier, _handlers[i]);
             }
             _ringBuffer.AddGatingSequences(_batchEventProcessors.Select(x => x.Sequence).ToArray());
         }

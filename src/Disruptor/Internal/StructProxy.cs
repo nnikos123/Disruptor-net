@@ -17,7 +17,16 @@ namespace Disruptor.Internal
             => eventHandler is IBatchStartAware batchStartAware ? batchStartAware : new NoopBatchStartAwareStruct();
 
         public static ISequenceBarrier CreateSequenceBarrier(ISequenceBarrier sequenceBarrier)
-            => sequenceBarrier is ProcessingSequenceBarrier processingSequenceBarrier ? new ProcessingSequenceBarrierStruct(processingSequenceBarrier) : sequenceBarrier;
+        {
+            var sequenceBarrierType = sequenceBarrier.GetType();
+            if (sequenceBarrierType.IsGenericType && sequenceBarrierType.GetGenericTypeDefinition() == typeof(ProcessingSequenceBarrier<,>))
+            {
+                var proxyType = typeof(ProcessingSequenceBarrierStruct<,>).MakeGenericType(sequenceBarrierType.GetGenericArguments());
+                return (ISequenceBarrier)Activator.CreateInstance(proxyType, sequenceBarrier);
+            }
+
+            return sequenceBarrier;
+        }
 
         public static IDataProvider<T> CreateDataProvider<T>(IDataProvider<T> dataProvider)
             where T : class
@@ -83,7 +92,7 @@ namespace Disruptor.Internal
             if (signalAllWhenBlockingMethodInfo == null)
                 return null;
 
-            var typeBuilder = _moduleBuilder.DefineType($"StructProxy_{waitStrategyType.Name}_{Guid.NewGuid():N}", TypeAttributes.Public, typeof(ValueType));
+            var typeBuilder = _moduleBuilder.DefineType($"StructProxy_{waitStrategyType.Name}_{Guid.NewGuid():N}", TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit, typeof(ValueType));
             typeBuilder.AddInterfaceImplementation(typeof(IWaitStrategy));
 
             var field = typeBuilder.DefineField("_waitStrategy", waitStrategyType, FieldAttributes.Private);
@@ -96,7 +105,7 @@ namespace Disruptor.Internal
             constructorGenerator.Emit(OpCodes.Stfld, field);
             constructorGenerator.Emit(OpCodes.Ret);
 
-            var waitForMethod = typeBuilder.DefineMethod(nameof(IWaitStrategy.WaitFor), MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final, typeof(long), new[] { typeof(long), typeof(Sequence), typeof(ISequence), typeof(ISequenceBarrier) });
+            var waitForMethod = typeBuilder.DefineMethod(nameof(IWaitStrategy.WaitFor), MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.HideBySig | MethodAttributes.NewSlot, typeof(long), new[] { typeof(long), typeof(Sequence), typeof(ISequence), typeof(ISequenceBarrier) });
             //waitForMethod.SetImplementationFlags(waitForMethod.GetMethodImplementationFlags() | MethodImplAttributes.AggressiveInlining);
 
             var waitForGenerator = waitForMethod.GetILGenerator();
@@ -106,10 +115,10 @@ namespace Disruptor.Internal
             waitForGenerator.Emit(OpCodes.Ldarg_2);
             waitForGenerator.Emit(OpCodes.Ldarg_3);
             waitForGenerator.Emit(OpCodes.Ldarg_S, (byte)4);
-            waitForGenerator.Emit(OpCodes.Call, waitForMethodInfo);
+            waitForGenerator.Emit(OpCodes.Callvirt, waitForMethodInfo);
             waitForGenerator.Emit(OpCodes.Ret);
 
-            var signalAllWhenBlockingMethod = typeBuilder.DefineMethod(nameof(IWaitStrategy.SignalAllWhenBlocking), MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final, typeof(void), Type.EmptyTypes);
+            var signalAllWhenBlockingMethod = typeBuilder.DefineMethod(nameof(IWaitStrategy.SignalAllWhenBlocking), MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.HideBySig | MethodAttributes.NewSlot, typeof(void), Type.EmptyTypes);
             signalAllWhenBlockingMethod.SetImplementationFlags(signalAllWhenBlockingMethod.GetMethodImplementationFlags() | MethodImplAttributes.AggressiveInlining);
 
             var signalAllWhenBlockingGenerator = signalAllWhenBlockingMethod.GetILGenerator();
@@ -124,6 +133,9 @@ namespace Disruptor.Internal
         private static T CreateProxyInstance<T>(T target, Dictionary<Type, Type> proxyTypes, Func<Type, Type> proxyFactory)
         {
             var targetType = target.GetType();
+
+            if (targetType.IsValueType)
+                return target;
 
             Type proxyType;
             lock (proxyTypes)
