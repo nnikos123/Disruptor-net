@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Disruptor.Internal;
 
@@ -22,7 +23,6 @@ namespace Disruptor
         public static ISequencer Create(int bufferSize, IWaitStrategy waitStrategy)
         {
             return DisruptorTypeFactory.CreateMultiProducerSequencer(bufferSize, waitStrategy);
-            //return new MultiProducerSequencer(bufferSize, waitStrategy);
         }
     }
 
@@ -93,36 +93,8 @@ namespace Disruptor
             _cursor.SetValue(sequence);
         }
 
-        /// <summary>
-        /// Claim the next event in sequence for publishing.
-        /// </summary>
-        /// <returns></returns>
-        public override long Next()
+        public long NextInternal(int n)
         {
-            return Next(1);
-        }
-
-        /// <summary>
-        /// Claim the next n events in sequence for publishing.  This is for batch event producing.  Using batch producing requires a little care and some math.
-        /// <code>
-        ///     int n = 10;
-        ///     long hi = sequencer.next(n);
-        ///     long lo = hi - (n - 1);
-        ///     for (long sequence = lo; sequence &lt;= hi; sequence++) {
-        ///        // Do work.
-        ///     }
-        ///     sequencer.publish(lo, hi);
-        /// </code>
-        /// </summary>
-        /// <param name="n">the number of sequences to claim</param>
-        /// <returns>the highest claimed sequence value</returns>
-        public override long Next(int n)
-        {
-            if (n < 1)
-            {
-                throw new ArgumentException("n must be > 0");
-            }
-
             long current;
             long next;
 
@@ -158,37 +130,40 @@ namespace Disruptor
         }
 
         /// <summary>
-        /// Attempt to claim the next event for publishing.  Will return the
-        /// number of the slot if there is at least one slot available.
-        /// 
-        /// Have a look at <see cref="Next()"/> for a description on how to
-        /// use this method.
+        /// Claim the next event in sequence for publishing.
         /// </summary>
-        /// <returns>the claimed sequence value</returns>
-        /// <exception cref="InsufficientCapacityException">there is no space available in the ring buffer.</exception>
-        public override long TryNext()
+        /// <returns></returns>
+        public override long Next()
         {
-            return TryNext(1);
+            return NextInternal(1);
         }
 
         /// <summary>
-        /// Attempt to claim the next <code>n</code> events in sequence for publishing.
-        /// Will return the highest numbered slot if there is at least <code>n</code> slots
-        /// available.
-        /// 
-        /// Have a look at <see cref="Next(int)"/> for a description on how to
-        /// use this method.
+        /// Claim the next n events in sequence for publishing.  This is for batch event producing.  Using batch producing requires a little care and some math.
+        /// <code>
+        ///     int n = 10;
+        ///     long hi = sequencer.next(n);
+        ///     long lo = hi - (n - 1);
+        ///     for (long sequence = lo; sequence &lt;= hi; sequence++) {
+        ///        // Do work.
+        ///     }
+        ///     sequencer.publish(lo, hi);
+        /// </code>
         /// </summary>
         /// <param name="n">the number of sequences to claim</param>
-        /// <returns>the claimed sequence value</returns>
-        /// <exception cref="InsufficientCapacityException">there is no space available in the ring buffer.</exception>
-        public override long TryNext(int n)
+        /// <returns>the highest claimed sequence value</returns>
+        public override long Next(int n)
         {
             if (n < 1)
             {
                 throw new ArgumentException("n must be > 0");
             }
 
+            return NextInternal(1);
+        }
+
+        internal long TryNextInternal(int n)
+        {
             long current;
             long next;
 
@@ -214,11 +189,68 @@ namespace Disruptor
         /// Have a look at <see cref="Next()"/> for a description on how to
         /// use this method.
         /// </summary>
+        /// <returns>the claimed sequence value</returns>
+        /// <exception cref="InsufficientCapacityException">there is no space available in the ring buffer.</exception>
+        public override long TryNext()
+        {
+            return TryNextInternal(1);
+        }
+
+        /// <summary>
+        /// Attempt to claim the next <code>n</code> events in sequence for publishing.
+        /// Will return the highest numbered slot if there is at least <code>n</code> slots
+        /// available.
+        /// 
+        /// Have a look at <see cref="Next(int)"/> for a description on how to
+        /// use this method.
+        /// </summary>
+        /// <param name="n">the number of sequences to claim</param>
+        /// <returns>the claimed sequence value</returns>
+        /// <exception cref="InsufficientCapacityException">there is no space available in the ring buffer.</exception>
+        public override long TryNext(int n)
+        {
+            if (n < 1)
+            {
+                throw new ArgumentException("n must be > 0");
+            }
+
+            return TryNextInternal(n);
+        }
+
+        internal bool TryNextInternal(int n, out long sequence)
+        {
+            long current;
+            long next;
+
+            do
+            {
+                current = _cursor.Value;
+                next = current + n;
+
+                if (!HasAvailableCapacity(Volatile.Read(ref _gatingSequences), n, current))
+                {
+                    sequence = default(long);
+                    return false;
+                }
+            }
+            while (!_cursor.CompareAndSet(current, next));
+
+            sequence = next;
+            return true;
+        }
+
+        /// <summary>
+        /// Attempt to claim the next event for publishing.  Will return the
+        /// number of the slot if there is at least one slot available.
+        /// 
+        /// Have a look at <see cref="Next()"/> for a description on how to
+        /// use this method.
+        /// </summary>
         /// <param name="sequence">the claimed sequence value</param>
         /// <returns>true of there is space available in the ring buffer, otherwise false.</returns>
         public override bool TryNext(out long sequence)
         {
-            return TryNext(1, out sequence);
+            return TryNextInternal(1, out sequence);
         }
 
         /// <summary>
@@ -239,24 +271,7 @@ namespace Disruptor
                 throw new ArgumentException("n must be > 0");
             }
 
-            long current;
-            long next;
-
-            do
-            {
-                current = _cursor.Value;
-                next = current + n;
-
-                if (!HasAvailableCapacity(Volatile.Read(ref _gatingSequences), n, current))
-                {
-                    sequence = default(long);
-                    return false;
-                }
-            }
-            while (!_cursor.CompareAndSet(current, next));
-
-            sequence = next;
-            return true;
+            return TryNextInternal(n, out sequence);
         }
 
         /// <summary>
@@ -279,14 +294,30 @@ namespace Disruptor
             SetAvailableBufferValue(0, -1);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void PublishInternal(long sequence)
+        {
+            SetAvailable(sequence);
+            _waitStrategy.SignalAllWhenBlocking();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void PublishInternal(long lo, long hi)
+        {
+            for (long l = lo; l <= hi; l++)
+            {
+                SetAvailable(l);
+            }
+            _waitStrategy.SignalAllWhenBlocking();
+        }
+
         /// <summary>
         /// Publish an event and make it visible to <see cref="IEventProcessor"/>s
         /// </summary>
         /// <param name="sequence">sequence to be published</param>
         public override void Publish(long sequence)
         {
-            SetAvailable(sequence);
-            _waitStrategy.SignalAllWhenBlocking();
+            PublishInternal(sequence);
         }
 
         /// <summary>
@@ -294,11 +325,7 @@ namespace Disruptor
         /// </summary>
         public override void Publish(long lo, long hi)
         {
-            for (long l = lo; l <= hi; l++)
-            {
-                SetAvailable(l);
-            }
-            _waitStrategy.SignalAllWhenBlocking();
+            PublishInternal(lo, hi);
         }
 
         private void SetAvailable(long sequence)

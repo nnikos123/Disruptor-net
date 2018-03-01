@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Disruptor.Internal;
 
@@ -65,36 +66,8 @@ namespace Disruptor
             return true;
         }
 
-        /// <summary>
-        /// Claim the next event in sequence for publishing.
-        /// </summary>
-        /// <returns></returns>
-        public override long Next()
+        internal long NextInternal(int n)
         {
-            return Next(1);
-        }
-
-        /// <summary>
-        /// Claim the next n events in sequence for publishing.  This is for batch event producing.  Using batch producing requires a little care and some math.
-        /// <code>
-        ///     int n = 10;
-        ///     long hi = sequencer.next(n);
-        ///     long lo = hi - (n - 1);
-        ///     for (long sequence = lo; sequence &lt;= hi; sequence++) {
-        ///        // Do work.
-        ///     }
-        ///     sequencer.publish(lo, hi);
-        /// </code>
-        /// </summary>
-        /// <param name="n">the number of sequences to claim</param>
-        /// <returns>the highest claimed sequence value</returns>
-        public override long Next(int n)
-        {
-            if (n < 1)
-            {
-                throw new ArgumentException("n must be > 0");
-            }
-
             long nextValue = _fields.NextValue;
 
             long nextSequence = nextValue + n;
@@ -121,6 +94,53 @@ namespace Disruptor
         }
 
         /// <summary>
+        /// Claim the next event in sequence for publishing.
+        /// </summary>
+        /// <returns></returns>
+        public override long Next()
+        {
+            return NextInternal(1);
+        }
+
+        /// <summary>
+        /// Claim the next n events in sequence for publishing.  This is for batch event producing.  Using batch producing requires a little care and some math.
+        /// <code>
+        ///     int n = 10;
+        ///     long hi = sequencer.next(n);
+        ///     long lo = hi - (n - 1);
+        ///     for (long sequence = lo; sequence &lt;= hi; sequence++) {
+        ///        // Do work.
+        ///     }
+        ///     sequencer.publish(lo, hi);
+        /// </code>
+        /// </summary>
+        /// <param name="n">the number of sequences to claim</param>
+        /// <returns>the highest claimed sequence value</returns>
+        public override long Next(int n)
+        {
+            if (n < 1)
+            {
+                throw new ArgumentException("n must be > 0");
+            }
+
+            return NextInternal(n);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal long TryNextInternal(int n)
+        {
+            if (!HasAvailableCapacity(n, true))
+            {
+                throw InsufficientCapacityException.Instance;
+            }
+
+            var nextSequence = _fields.NextValue + n;
+            _fields.NextValue = nextSequence;
+
+            return nextSequence;
+        }
+
+        /// <summary>
         /// Attempt to claim the next event for publishing.  Will return the
         /// number of the slot if there is at least one slot available.
         /// 
@@ -131,7 +151,7 @@ namespace Disruptor
         /// <exception cref="InsufficientCapacityException">there is no space available in the ring buffer.</exception>
         public override long TryNext()
         {
-            return TryNext(1);
+            return TryNextInternal(1);
         }
 
         /// <summary>
@@ -152,15 +172,23 @@ namespace Disruptor
                 throw new ArgumentException("n must be > 0");
             }
 
+            return TryNextInternal(n);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal bool TryNextInternal(int n, out long sequence)
+        {
             if (!HasAvailableCapacity(n, true))
             {
-                throw InsufficientCapacityException.Instance;
+                sequence = default(long);
+                return false;
             }
 
             var nextSequence = _fields.NextValue + n;
             _fields.NextValue = nextSequence;
 
-            return nextSequence;
+            sequence = nextSequence;
+            return true;
         }
 
         /// <summary>
@@ -174,7 +202,7 @@ namespace Disruptor
         /// <returns>true of there is space available in the ring buffer, otherwise false.</returns>
         public override bool TryNext(out long sequence)
         {
-            return TryNext(1, out sequence);
+            return TryNextInternal(1, out sequence);
         }
 
         /// <summary>
@@ -195,17 +223,8 @@ namespace Disruptor
                 throw new ArgumentException("n must be > 0");
             }
 
-            if (!HasAvailableCapacity(n, true))
-            {
-                sequence = default(long);
-                return false;
-            }
 
-            var nextSequence = _fields.NextValue + n;
-            _fields.NextValue = nextSequence;
-
-            sequence = nextSequence;
-            return true;
+            return TryNextInternal(n, out sequence);
         }
 
         /// <summary>
@@ -229,14 +248,20 @@ namespace Disruptor
             _fields.NextValue = sequence;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void PublishInternal(long sequence)
+        {
+            _cursor.SetValue(sequence);
+            _waitStrategy.SignalAllWhenBlocking();
+        }
+
         /// <summary>
         /// Publish an event and make it visible to <see cref="IEventProcessor"/>s
         /// </summary>
         /// <param name="sequence">sequence to be published</param>
         public override void Publish(long sequence)
         {
-            _cursor.SetValue(sequence);
-            _waitStrategy.SignalAllWhenBlocking();
+            PublishInternal(sequence);
         }
 
         /// <summary>
@@ -246,7 +271,7 @@ namespace Disruptor
         /// <param name="hi">last sequence number to publish</param>
         public override void Publish(long lo, long hi)
         {
-            Publish(hi);
+            PublishInternal(hi);
         }
 
         /// <summary>
