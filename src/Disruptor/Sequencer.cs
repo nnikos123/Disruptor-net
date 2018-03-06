@@ -33,6 +33,7 @@ namespace Disruptor
         protected readonly int _bufferSize;
         // ReSharper disable once FieldCanBeMadeReadOnly.Global (performance: the runtime type will be a struct)
         protected TWaitStrategy _waitStrategy;
+        protected readonly bool _isBlockingWaitStrategy;
         protected readonly Sequence _cursor = new Sequence();
 
         /// <summary>Volatile in the Java version => always use Volatile.Read/Write or Interlocked methods to access this field.</summary>
@@ -56,6 +57,7 @@ namespace Disruptor
 
             _bufferSize = bufferSize;
             _waitStrategy = waitStrategy;
+            _isBlockingWaitStrategy = !(waitStrategy is INonBlockingWaitStrategy);
         }
 
         /// <summary>

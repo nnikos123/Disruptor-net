@@ -298,7 +298,11 @@ namespace Disruptor
         public void PublishInternal(long sequence)
         {
             SetAvailable(sequence);
-            _waitStrategy.SignalAllWhenBlocking();
+
+            if (_isBlockingWaitStrategy)
+            {
+                _waitStrategy.SignalAllWhenBlocking();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -308,7 +312,11 @@ namespace Disruptor
             {
                 SetAvailable(l);
             }
-            _waitStrategy.SignalAllWhenBlocking();
+
+            if (_isBlockingWaitStrategy)
+            {
+                _waitStrategy.SignalAllWhenBlocking();
+            }
         }
 
         /// <summary>

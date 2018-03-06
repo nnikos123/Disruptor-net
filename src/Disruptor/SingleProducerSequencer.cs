@@ -252,7 +252,11 @@ namespace Disruptor
         internal void PublishInternal(long sequence)
         {
             _cursor.SetValue(sequence);
-            _waitStrategy.SignalAllWhenBlocking();
+
+            if (_isBlockingWaitStrategy)
+            {
+                _waitStrategy.SignalAllWhenBlocking();
+            }
         }
 
         /// <summary>
