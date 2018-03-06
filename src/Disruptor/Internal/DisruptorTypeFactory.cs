@@ -20,33 +20,13 @@ namespace Disruptor.Internal
 
         public static ISequenceBarrier CreateSequenceBarrier(ISequencer sequencer, IWaitStrategy waitStrategy, Sequence cursorSequence, ISequence[] dependentSequences)
         {
-            return new ProcessingSequenceBarrier(sequencer, waitStrategy, cursorSequence, dependentSequences);
+            //return new ProcessingSequenceBarrier(sequencer, waitStrategy, cursorSequence, dependentSequences);
 
-            //var sequencerProxy = StructProxy.CreateProxyInstance(sequencer);
-            //var waitStrategyProxy = StructProxy.CreateProxyInstance(waitStrategy);
+            var sequencerProxy = StructProxy.CreateProxyInstance(sequencer);
+            var waitStrategyProxy = StructProxy.CreateProxyInstance(waitStrategy);
 
-            //var sequencerBarrierType = typeof(ProcessingSequenceBarrier<,>).MakeGenericType(sequencerProxy.GetType(), waitStrategyProxy.GetType());
-            //return (ISequenceBarrier)Activator.CreateInstance(sequencerBarrierType, sequencerProxy, waitStrategyProxy, cursorSequence, dependentSequences);
-        }
-
-        public static ISequencer CreateSingleProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
-        {
-            return new SingleProducerSequencer(bufferSize, waitStrategy);
-
-            //var waitStrategyProxy = StructProxy.CreateProxyInstance(waitStrategy);
-
-            //var sequencerType = typeof(SingleProducerSequencer<>).MakeGenericType(waitStrategyProxy.GetType());
-            //return (ISequencer)Activator.CreateInstance(sequencerType, bufferSize, waitStrategyProxy);
-        }
-
-        public static ISequencer CreateMultiProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
-        {
-            return new MultiProducerSequencer(bufferSize, waitStrategy);
-
-            //var waitStrategyProxy = StructProxy.CreateProxyInstance(waitStrategy);
-
-            //var sequencerType = typeof(MultiProducerSequencer).MakeGenericType(waitStrategyProxy.GetType());
-            //return (ISequencer)Activator.CreateInstance(sequencerType, bufferSize, waitStrategyProxy);
+            var sequencerBarrierType = typeof(ProcessingSequenceBarrier<,>).MakeGenericType(sequencerProxy.GetType(), waitStrategyProxy.GetType());
+            return (ISequenceBarrier)Activator.CreateInstance(sequencerBarrierType, sequencerProxy, waitStrategyProxy, cursorSequence, dependentSequences);
         }
     }
 }

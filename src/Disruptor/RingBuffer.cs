@@ -53,7 +53,7 @@ namespace Disruptor
         /// <param name="eventFactory"> eventFactory to create entries for filling the RingBuffer</param>
         /// <param name="bufferSize">number of elements to create within the ring buffer.</param>
         public RingBuffer(Func<T> eventFactory, int bufferSize)
-            : this(eventFactory, MultiProducerSequencer.Create(bufferSize, new BlockingWaitStrategy()))
+            : this(eventFactory, new MultiProducerSequencer(bufferSize, new BlockingWaitStrategy()))
         {
         }
 
@@ -67,7 +67,7 @@ namespace Disruptor
         /// <exception cref="ArgumentException">if bufferSize is less than 1 or not a power of 2</exception>
         public static RingBuffer<T> CreateMultiProducer(Func<T> factory, int bufferSize, IWaitStrategy waitStrategy)
         {
-            var sequencer = MultiProducerSequencer.Create(bufferSize, waitStrategy);
+            var sequencer = new MultiProducerSequencer(bufferSize, waitStrategy);
 
             return new RingBuffer<T>(factory, sequencer);
         }
@@ -94,7 +94,7 @@ namespace Disruptor
         /// <exception cref="ArgumentException">if bufferSize is less than 1 or not a power of 2</exception>
         public static RingBuffer<T> CreateSingleProducer(Func<T> factory, int bufferSize, IWaitStrategy waitStrategy)
         {
-            var sequencer = SingleProducerSequencer.Create(bufferSize, waitStrategy);
+            var sequencer = new SingleProducerSequencer(bufferSize, waitStrategy);
 
             return new RingBuffer<T>(factory, sequencer);
         }

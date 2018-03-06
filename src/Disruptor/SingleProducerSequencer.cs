@@ -1,30 +1,14 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using Disruptor.Internal;
 
 namespace Disruptor
 {
-    public class SingleProducerSequencer : SingleProducerSequencer<IWaitStrategy>
-    {
-        public SingleProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
-            : base(bufferSize, waitStrategy)
-        {
-        }
-
-        public static ISequencer Create(int bufferSize, IWaitStrategy waitStrategy)
-        {
-            return DisruptorTypeFactory.CreateSingleProducerSequencer(bufferSize, waitStrategy);
-            //return new SingleProducerSequencer(bufferSize, waitStrategy);
-        }
-    }
-
-    public class SingleProducerSequencer<TWaitStrategy> : Sequencer<TWaitStrategy>
-        where TWaitStrategy : IWaitStrategy
+    public class SingleProducerSequencer : Sequencer
     {
         private SingleProducerSequencerFields _fields = new SingleProducerSequencerFields(Sequence.InitialCursorValue, Sequence.InitialCursorValue);
 
-        public SingleProducerSequencer(int bufferSize, TWaitStrategy waitStrategy)
+        public SingleProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
             : base(bufferSize, waitStrategy)
         {
         }

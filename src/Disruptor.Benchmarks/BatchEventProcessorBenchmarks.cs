@@ -10,7 +10,7 @@ namespace Disruptor.Benchmarks
 
         public BatchEventProcessorBenchmarks()
         {
-            _ringBuffer = new RingBuffer<TestEvent>(() => new TestEvent(), SingleProducerSequencer.Create(4096, new SpinWaitWaitStrategy()));
+            _ringBuffer = new RingBuffer<TestEvent>(() => new TestEvent(), new SingleProducerSequencer(4096, new SpinWaitWaitStrategy()));
             _eventHandler = new TestEventHandler();
             _processor = new BatchEventProcessor<TestEvent>(_ringBuffer, _ringBuffer.NewBarrier(), _eventHandler);
 

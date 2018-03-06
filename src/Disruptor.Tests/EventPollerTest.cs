@@ -11,7 +11,7 @@ namespace Disruptor.Tests
         public void ShouldPollForEvents()
         {
             var gatingSequence = new Sequence();
-            var sequencer = SingleProducerSequencer.Create(16, new BusySpinWaitStrategy());
+            var sequencer = new SingleProducerSequencer(16, new BusySpinWaitStrategy());
 
             bool Handler(object e, long s, bool b) => false;
 

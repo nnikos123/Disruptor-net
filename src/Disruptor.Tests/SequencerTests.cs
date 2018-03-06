@@ -26,9 +26,9 @@ namespace Disruptor.Tests
             switch (producerType)
             {
                 case ProducerType.Single:
-                    return SingleProducerSequencer.Create(bufferSize, waitStrategy);
+                    return new SingleProducerSequencer(bufferSize, waitStrategy);
                 case ProducerType.Multi:
-                    return MultiProducerSequencer.Create(bufferSize, waitStrategy);
+                    return new MultiProducerSequencer(bufferSize, waitStrategy);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(producerType), producerType, null);
             }

@@ -9,30 +9,10 @@ namespace Disruptor
     /// common functionality like the management of gating sequences (add/remove) and
     /// ownership of the current cursor.
     /// </summary>
-    public abstract class Sequencer : Sequencer<IWaitStrategy>
-    {
-        /// <summary>
-        /// Create with the specified buffer size and wait strategy.
-        /// </summary>
-        /// <param name="bufferSize">The total number of entries, must be a positive power of 2.</param>
-        /// <param name="waitStrategy">The wait strategy used by this sequencer</param>
-        public Sequencer(int bufferSize, IWaitStrategy waitStrategy)
-            : base(bufferSize, waitStrategy)
-        {
-        }
-    }
-
-    /// <summary>
-    /// Base class for the various sequencer types (single/multi).  Provides
-    /// common functionality like the management of gating sequences (add/remove) and
-    /// ownership of the current cursor.
-    /// </summary>
-    public abstract class Sequencer<TWaitStrategy> : ISequencer
-        where TWaitStrategy : IWaitStrategy
+    public abstract class Sequencer : ISequencer
     {
         protected readonly int _bufferSize;
-        // ReSharper disable once FieldCanBeMadeReadOnly.Global (performance: the runtime type will be a struct)
-        protected TWaitStrategy _waitStrategy;
+        protected readonly IWaitStrategy _waitStrategy;
         protected readonly bool _isBlockingWaitStrategy;
         protected readonly Sequence _cursor = new Sequence();
 
@@ -44,7 +24,7 @@ namespace Disruptor
         /// </summary>
         /// <param name="bufferSize">The total number of entries, must be a positive power of 2.</param>
         /// <param name="waitStrategy">The wait strategy used by this sequencer</param>
-        public Sequencer(int bufferSize, TWaitStrategy waitStrategy)
+        public Sequencer(int bufferSize, IWaitStrategy waitStrategy)
         {
             if (bufferSize < 1)
             {
