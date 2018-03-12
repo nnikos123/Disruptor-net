@@ -1,39 +1,38 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Disruptor
 {
-    [StructLayout(LayoutKind.Explicit, Size = 160)]
-    public class SingleProducerSequencer : ISequencer
+    public class SingleProducerSequencerLhsPadding
     {
-        [FieldOffset(0)]
-        private readonly IWaitStrategy _waitStrategy;
+        protected IWaitStrategy _waitStrategy;
 
-        [FieldOffset(8)]
-        private readonly Sequence _cursor = new Sequence();
+        protected Sequence _cursor = new Sequence();
 
-        [FieldOffset(16)]
         // volatile in the Java version => always use Volatile.Read/Write or Interlocked methods to access this field.
-        private ISequence[] _gatingSequences = new ISequence[0];
+        protected ISequence[] _gatingSequences = new ISequence[0];
 
-        [FieldOffset(24)]
-        private readonly int _bufferSize;
+        protected int _bufferSize;
 
-        [FieldOffset(28)]
-        private readonly bool _isBlockingWaitStrategy;
+        protected bool _isBlockingWaitStrategy;
 
-        // padding: 56
+        protected long _p1, _p2, _p3, _p4, _p5, _p6, _p7;
+    }
 
-        [FieldOffset(88)]
-        private long _nextValue = Sequence.InitialCursorValue;
+    public class SingleProducerSequencerFields : SingleProducerSequencerLhsPadding
+    {
+        protected long _nextValue = Sequence.InitialCursorValue;
+        protected long _cachedValue = Sequence.InitialCursorValue;
+    }
 
-        [FieldOffset(96)]
-        private long _cachedValue = Sequence.InitialCursorValue;
+    public class SingleProducerSequencerRhsPadding : SingleProducerSequencerFields
+    {
+        protected long _p9, _p10, _p11, _p12, _p13, _p14, _p15;
+    }
 
-        // padding: 56
-
+    public class SingleProducerSequencer : SingleProducerSequencerRhsPadding, ISequencer
+    {
         public SingleProducerSequencer(int bufferSize, IWaitStrategy waitStrategy)
         {
             if (bufferSize < 1)
